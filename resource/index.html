@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Node Debug Demo</title>
+  <link rel="stylesheet" type="text/css"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.6/styles/default.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.6/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlightjs-line-numbers.js@2.6.0/dist/highlightjs-line-numbers.min.js">
+  </script>
+  <style>
+    body {
+      padding: 10px 20px;
+      width: 1130px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 40px;
+      ;
+    }
+
+    td.hljs-ln-numbers {
+      text-align: center;
+      color: #ccc;
+      border-right: 1px solid #999;
+      vertical-align: top;
+      padding-right: 5px;
+      padding-left: 15px;
+    }
+
+    .hljs-ln-line {
+      white-space: pre;
+    }
+
+    td.hljs-ln-code {
+      padding-left: 10px;
+    }
+
+    .hljs-ln-numbers {
+      position: relative;
+      cursor: pointer;
+    }
+
+    tr.br_on .hljs-ln-numbers::before,
+    tr.br_active .hljs-ln-numbers::before {
+      content: " ";
+      position: absolute;
+      left: 4px;
+      border: 4px solid #ff9800;
+      height: 0;
+      width: 0;
+      line-height: 0;
+      overflow: hidden;
+      border-radius: 100%;
+      top: 4px;
+    }
+
+    tr.br_active .hljs-ln-numbers::before {
+      border-color: #FFEB3B;
+    }
+
+    tr.br_active {
+      background: #ff9800;
+    }
+
+    #logBox {
+      line-height: 18px;
+      font-size: 12px;
+      border: 1px solid #CCC;
+      padding: 10px;
+      font-family: 'Courier New', Courier, monospace;
+      max-height: 200px;
+      overflow-y: auto;
+      clear: left;
+      margin-top: 20px;
+      position: relative;
+      min-height: 20px;
+    }
+
+    #logBox p span {
+      color: #888;
+    }
+
+    #logBox p {
+      margin: 0;
+    }
+
+    #main {
+      width: 800px;
+      margin-right: 20px;
+      float: left;
+    }
+
+    #logBox button {
+      position: sticky;
+      left: 100%;
+      top: 0;
+    }
+
+    #sub {
+      border: 1px solid #CCC;
+      float: left;
+      width: 300px;
+      margin-top: 38px;
+    }
+
+    #sub p {
+      border-bottom: 1px solid #CCC;
+      padding: 8px;
+      font-size: 14px;
+      text-align: center;
+      margin: 0;
+      color: #555;
+    }
+
+    #sub div {
+      height: 138px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Node Debug Demo</h2>
+  <div id="main">
+    <div>
+      <button onclick="debugUtils.start()">开始调试</button>
+      <button onclick="debugUtils.cont()">进入下一个断点</button>
+      <button onclick="debugUtils.next()">下一步</button>
+      <button onclick="debugUtils.step()">进入函数</button>
+      <button onclick="debugUtils.out()">跳出函数</button>
+    </div>
+    <pre id="code"><code class="js lineNumbers">{%content%}</code></pre>
+  </div>
+  <div id="sub">
+    <p>调用栈</p>
+    <div></div>
+  </div>
+  <div id="logBox">
+    <span>日志信息</span>
+    <button onclick="app.clearLog()">清空</button>
+  </div>
+  <script>
+    const debugUtils = {
+      totalLines: 0,
+      currentLine: {
+        val: -1,
+        set: function (l) {
+          app.activeLine(l);
+          this.val = l;
+          if (l > -1) {
+            app.log(`断点进入，行： ${l}`);
+          } else {
+            debugUtils.end();
+          }
+        }
+      },
+      lines: {
+        val: [],
+        add: function (l) {
+          if (this.val.indexOf(l) === -1) {
+            this.val.push(l);
+            this.val = this.val.sort();
+            debugUtils.sb(l);
+          }
+        },
+        remove: function (l) {
+          const index = this.val.indexOf(l);
+          if (index !== -1) {
+            this.val.splice(index, 1);
+            debugUtils.cb(l);
+          }
+        },
+        read: function () {
+          return this.val[0];
+        },
+        clean: function () {
+          let index = -1;
+          for (let i = 0; i < this.val.length; i++) {
+            if (this.val[i] <= debugUtils.currentLine.val) {
+              index = i;
+            }
+          }
+          if (index > -1) {
+            this.val.splice(0, index + 1);
+          }
+        }
+      },
+      setCurrentLine: function (l) {
+        this.currentLine.set(l);
+        this.lines.clean();
+      },
+      start: function () {
+        if (this.currentLine.val >= 0) return;
+        app.log('启动调试');
+        const l = this.lines.read() || 0;
+        this.currentLine.set(l);
+        this.lines.clean();
+      },
+      cont: function () {
+        if (this.currentLine.val < 0) return;
+        const l = this.lines.read();
+        if (!l) {
+          this.currentLine.set(-1);
+          return;
+        }
+        app.log('进入下一个断点');
+        this.currentLine.set(l);
+        this.lines.clean();
+      },
+      next: function () {
+        const l = this.currentLine.val;
+        if (l < 0) return;
+        if (l == this.totalLines - 1) {
+          this.currentLine.set(-1);
+          return;
+        }
+        app.log('下一步');
+        this.currentLine.set(l + 1);
+        this.lines.clean();
+      },
+      step: function () {
+        if (this.currentLine.val < 0) return;
+        app.log('进入函数');
+      },
+      out: function () {
+        if (this.currentLine.val < 0) return;
+        app.log('跳出函数');
+      },
+      sb: function (line) {
+        if (this.currentLine.val < 0) return;
+        app.log(`添加断点，行：${line}`);
+      },
+      cb: function (line) {
+        if (this.currentLine.val < 0) return;
+        app.log(`移除断点，行：${line}`);
+      },
+      end: function () {
+        app.log('调试结束');
+      },
+      send: function () {},
+      onMessage: function () {}
+    };
+
+    const app = {
+      init: function () {
+        app.log(`初始化`);
+        hljs.initHighlightingOnLoad();
+        hljs.initLineNumbersOnLoad();
+        setTimeout(function () {
+          app.bind();
+          // debugUtils.start();
+        }, 100);
+      },
+      bind: function () {
+        const trs = [].slice.call(document.querySelectorAll('#code tr'))
+        debugUtils.totalLines = trs.length;
+        trs.map(function (tr, index) {
+          tr.querySelector('.hljs-ln-numbers').addEventListener('click', function () {
+            tr.classList.toggle('br_on');
+            if (tr.classList.contains('br_on')) {
+              debugUtils.lines.add(index);
+            } else {
+              debugUtils.lines.remove(index);
+            }
+          });
+        });
+      },
+      activeLine: function (l) {
+        [].slice.call(document.querySelectorAll('#code tr')).forEach(function (tr, index) {
+          tr.classList.remove('br_active');
+          if (index <= l) {
+            tr.classList.remove('br_on');
+          }
+        });
+        if (l > -1) {
+          document.querySelector(`#code tr:nth-child(${l + 1})`).classList.add('br_active');
+        }
+      },
+      log: function (msg) {
+        if (msg) {
+          const p = document.createElement('p');
+          p.innerHTML = `<span>[ ${new Date().toISOString().split('.')[0].replace('T', ' ')} ]</span> ` + msg;
+          logBox.appendChild(p);
+          logBox.scrollTo(0, 1E5);
+        }
+      },
+      clearLog: function () {
+        [].slice.call(logBox.querySelectorAll('p')).forEach(p => logBox.removeChild(p));
+      }
+    };
+    app.init();
+  </script>
+</body>
+
+</html>
