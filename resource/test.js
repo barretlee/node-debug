@@ -2,10 +2,16 @@
 
 let http = require('http');
 
+console.log('[log] entry');
+
 const server = http.createServer((req, res) => {
-  res.end('hi');
+  res.write('[log] hello\n');
+  setTimeout(() => {
+    debugger;
+    res.end('[log] world');
+  }, 0);
 });
 
 server.listen(8888, () => {
-  console.log('start server');
+  console.log('[log] start server');
 });

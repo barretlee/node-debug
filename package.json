@@ -1,15 +1,9 @@
 {
-  "dependencies": {
-    "vscode-debugadapter": "^1.37.1"
-  },
-  "devDependencies": {
-    "@commitlint/cli": "^8.2.0",
-    "@commitlint/config-conventional": "^8.2.0",
-    "husky": "^3.0.9"
-  },
-  "husky": {
-    "hooks": {
-      "commit-msg": "node ./node_modules/@commitlint/cli/lib/cli.js -E HUSKY_GIT_PARAMS"
-    }
+  "name": "node-debug-demo",
+  "description": "Node Debug Demo",
+  "version": "0.0.1",
+  "scripts": {
+    "init": "git submodule update --init --recursive; cd vscode-node-debug2; npm install; npm run build",
+    "start": "node server.js"
   }
 }
